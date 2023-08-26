@@ -1,0 +1,513 @@
+#include <Arduino.h>
+#include "driver/ledc.h"
+#include <stdint.h>
+// Paso 1: selección de parámetros de la señal PWM
+#define ledRChannel 1
+#define ledGChannel 2
+#define ledBChannel 3
+#define freqPWM 5000 // Frecuencia en Hz
+#define freqPWM1 5000 // Frecuencia en Hz
+#define freqPWM2 5000 // Frecuencia en Hz
+#define resolution 8 // 1-16 bits de resolución
+#define pinADC 4 //definición pin del sensor
+
+//Variables para el control del servo motor
+const int servoChannel = 7; //Canal para el servo motor
+const int servoPin = 15; //Pin del servo motor
+int angle = 0; //Ángulo/posición inicial del servo (0: Verde, 1: Amarillo, 2: Rojo)
+//Posición establecida del servo por color de LED
+const int servoPositionGreen = 9; //Posición del servo para el LED verde
+const int servoPositionYellow = 13; //Posición del servo para el LED amarillo
+const int servoPositionRed = 17; //Posición del servo para el LED rojo
+
+//declaración de los pines para los 7 segmentos de los displays 
+uint8_t pA = 13; 
+uint8_t pB = 12; 
+uint8_t pC = 14; 
+uint8_t pD = 27; 
+uint8_t pE = 26; 
+uint8_t pF = 25; 
+uint8_t pG = 33; 
+uint8_t pdp = 5; 
+
+//declaración de los pines para los transistores de los 3 displays
+//display de decenas
+uint8_t t1 = 32; 
+//display de unidades
+uint8_t t2 = 2; 
+//display de decimales
+uint8_t t3 = 23; 
+
+// Definición de pines
+const int  pinLedR = 18;
+const int  pinLedG  = 19;
+const int  pinLedB = 21;
+const int pulsador_b3 = 22; // Pin 14 donde se conecta el botón para obtener la temperatura
+
+//VARIABLE PARA EL BRILLO DE LAS LEDS 
+int dutycycle  = 255; 
+int adcRaw = 0;
+
+//DECLARACIÓN DE FUNCIONES
+void configurarPWM(void); // Declaración anticipada de la función configurarPWM
+void desplegarValorDecenas (uint8_t decenas); //Declaración de la función para despleglar la temperatura 
+void desplegarValorUnidades (uint8_t unidades); //Declaración de la función para despleglar la temperatura 
+void desplegarValorDecimal (uint8_t decimal); //Declaración de la función para despleglar la temperatura 
+
+//Función que configura el PWM de las leds 
+void configurarPWM(void)
+{
+  // Paso 1: Configurar el módulo PWM
+  ledcSetup(ledRChannel, freqPWM1, resolution);
+  ledcSetup(ledGChannel, freqPWM2, resolution);
+  ledcSetup(ledBChannel, freqPWM, resolution);
+
+  // Paso 2: seleccionar en que GPIO tendremos nuestra señal PWM
+  ledcAttachPin(pinLedR, ledRChannel);
+  ledcAttachPin(pinLedG, ledGChannel);
+  ledcAttachPin(pinLedB, ledBChannel);
+
+  
+}
+
+uint8_t temp = 0; 
+uint8_t unidades = 0; 
+uint8_t decenas = 0; 
+uint8_t decimal = 0; 
+uint8_t valor = 0;
+
+void setup(){
+//Inicializando la posición inicial
+  Serial.begin(115200);
+  adcRaw = 0;
+  pinMode(pulsador_b3, INPUT_PULLUP); // Configurar botón B4 como entrada con pull-up
+  configurarPWM(); //configuración del PWM de las leds 
+  ledcSetup(servoChannel, 50, 16); //Canal 7, frecuencia de 50Hz, resolución de 16-bits (0-65535)
+  ledcAttachPin(servoPin, servoChannel);
+ //Inicializando la posición inicial
+  ledcWrite(servoChannel, map(angle, 0, 180, 0, 65535));
+
+  pinMode(pA, OUTPUT);
+  pinMode(pB, OUTPUT);
+  pinMode(pC, OUTPUT);
+  pinMode(pD, OUTPUT);
+  pinMode(pE, OUTPUT);
+  pinMode(pF, OUTPUT);
+  pinMode(pG, OUTPUT);
+  pinMode(pdp, OUTPUT);
+
+  pinMode(t1, OUTPUT);
+  pinMode(t2, OUTPUT);
+  pinMode(t3, OUTPUT);
+
+  digitalWrite(t1, LOW);
+  digitalWrite(t2, LOW);
+  digitalWrite(t3, LOW);
+
+
+}
+
+void loop(){
+
+  digitalWrite(t1, HIGH);
+  digitalWrite(t2, LOW);
+  digitalWrite(t3, LOW);
+  desplegarValorDecenas(decenas);
+  delay(5);
+
+  digitalWrite(t1, LOW);
+  digitalWrite(t2, HIGH);
+  digitalWrite(t3, LOW);
+  desplegarValorUnidades(unidades);
+  digitalWrite(pdp, HIGH);
+  delay(5);
+
+  digitalWrite(t1, LOW);
+  digitalWrite(t2, LOW);
+  digitalWrite(t3, HIGH);
+  desplegarValorDecimal(decimal);
+  delay(5);
+
+//Al presionar el botón se activa el sensor
+  if(digitalRead(pulsador_b3)== LOW){
+    digitalWrite(t1, LOW);
+    digitalWrite(t2, LOW);
+    digitalWrite(t3, LOW);
+    digitalWrite(pA, LOW);
+    digitalWrite(pB, LOW);
+    digitalWrite(pC, LOW);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, LOW);
+
+  //Lectura del sensor
+  analogRead(pinADC);
+  adcRaw = analogRead(pinADC);
+  float voltage = adcRaw * (3.3 / 4095.0); // Convertir lectura a voltaje (3.3V para ESP32)
+  float temperatureC = (voltage + 0.0754) * 100.0; // Convertir voltaje a temperatura en grados Celsius (ajuste para 3.3V)
+  // Redondear la temperatura a un decimal
+  temperatureC = round(temperatureC * 10.0) / 10.0;
+  delay(1000); 
+
+  //Impresión en el monitor serial de la lectura del sensor
+  Serial.print("ADC Raw: ");
+  Serial.print(adcRaw);
+  Serial.print(", Voltage: ");
+  Serial.print(voltage, 4); // Imprimir el voltaje con 4 decimales
+  Serial.print(", Temperature: ");
+  Serial.println(temperatureC, 2); // Imprimir la temperatura con 2 decimales
+
+  // Control del servo basado en la temperatura
+  
+
+  //SERVO EN POSICIÓN DE MAPEO Y LED VERDE ENCENDIDA
+  if (temperatureC < 24) {
+    ledcWrite(ledRChannel, dutycycle); //led verde encendida
+    ledcWrite(ledGChannel, 0); // 
+    ledcWrite(ledBChannel, 0); // 
+    ledcWrite(servoChannel, map(servoPositionGreen, 0, 180, 0, 65535));
+  }
+
+//SERVO EN POSICIÓN DE MAPEO Y LED AMARILLA ENCENDIDA
+  if (temperatureC >= 24 && temperatureC < 26) {
+    ledcWrite(ledRChannel, 0); 
+    ledcWrite(ledGChannel, dutycycle);// led amarilla encendida
+    ledcWrite(ledBChannel, 0); 
+    ledcWrite(servoChannel, map(servoPositionYellow, 0, 180, 0, 65535));
+ }
+
+//SERVO EN POSICIÓN DE MAPEO Y LED ROJA ENCENDIDA
+  if (temperatureC >= 26) {
+    ledcWrite(ledRChannel, 0); 
+    ledcWrite(ledGChannel, 0); 
+    ledcWrite(ledBChannel, dutycycle);// led roja encendida
+    ledcWrite(servoChannel, map(servoPositionRed, 0, 180, 0, 65535));
+ }
+
+
+temp = temperatureC * 10; 
+decenas = temp / 100; 
+temp = temp - (decenas * 100);
+unidades = temp / 10;  // Corrección en esta línea
+decimal = int(temperatureC * 10) % 10;  // Corrección en esta línea
+    }
+}
+
+//FUNCIÓN PARA DESPLEGAR VALOR DE DECENAS
+void desplegarValorDecenas(uint8_t decenas){
+  switch (decenas)
+  {
+  case 0:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, LOW);
+    break;
+  case 1:
+    digitalWrite(pA, LOW);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, LOW);
+    break;
+  
+  case 2:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, LOW);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 3:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 4:
+    digitalWrite(pA, LOW);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 5:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, LOW);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 6:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, LOW);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 7:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, LOW);
+    break;
+
+case 8:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 9:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+   
+  }
+}
+
+//FUNCIÓN PARA DESPLEGAR VALOR DE UNIDADES
+void desplegarValorUnidades (uint8_t unidades){
+  switch (unidades)
+  {
+  case 0:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, LOW);
+    break;
+  case 1:
+    digitalWrite(pA, LOW);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, LOW);
+    break;
+  
+  case 2:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, LOW);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 3:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 4:
+    digitalWrite(pA, LOW);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 5:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, LOW);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 6:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, LOW);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 7:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, LOW);
+    break;
+
+case 8:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 9:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+   
+  }
+}
+//FUNCIÓN PARA DESPLEGAR VALOR DE DECIMALES
+void desplegarValorDecimal (uint8_t decimal){
+  switch (decimal)
+  {
+  case 0:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, LOW);
+    break;
+  case 1:
+    digitalWrite(pA, LOW);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, LOW);
+    break;
+  
+  case 2:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, LOW);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 3:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 4:
+    digitalWrite(pA, LOW);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 5:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, LOW);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 6:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, LOW);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 7:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, LOW);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, LOW);
+    digitalWrite(pG, LOW);
+    break;
+
+case 8:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, HIGH);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+
+case 9:
+    digitalWrite(pA, HIGH);
+    digitalWrite(pB, HIGH);
+    digitalWrite(pC, HIGH);
+    digitalWrite(pD, HIGH);
+    digitalWrite(pE, LOW);
+    digitalWrite(pF, HIGH);
+    digitalWrite(pG, HIGH);
+    break;
+  }
+}
