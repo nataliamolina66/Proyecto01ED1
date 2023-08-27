@@ -1,6 +1,13 @@
 #include <Arduino.h>
 #include "driver/ledc.h"
 #include <stdint.h>
+#include <config.h>
+
+volatile float temperatureC;
+
+//Se define el canal que va a mandar datos al feed "Temperatura"
+//AdafruitIO_Feed *tempCanal = io.feed("temperatura");
+
 // Paso 1: selección de parámetros de la señal PWM
 #define ledRChannel 1
 #define ledGChannel 2
@@ -46,13 +53,9 @@ const int pulsador_b3 = 22; // Pin 14 donde se conecta el botón para obtener la
 
 //VARIABLE PARA EL BRILLO DE LAS LEDS 
 int dutycycle  = 255; 
-int adcRaw = 0;
-
 //DECLARACIÓN DE FUNCIONES
 void configurarPWM(void); // Declaración anticipada de la función configurarPWM
-void desplegarValorDecenas (uint8_t decenas); //Declaración de la función para despleglar la temperatura 
-void desplegarValorUnidades (uint8_t unidades); //Declaración de la función para despleglar la temperatura 
-void desplegarValorDecimal (uint8_t decimal); //Declaración de la función para despleglar la temperatura 
+void desplegarValor (uint8_t digito); //Declaración de la función para despleglar la temperatura 
 
 //Función que configura el PWM de las leds 
 void configurarPWM(void)
@@ -66,8 +69,6 @@ void configurarPWM(void)
   ledcAttachPin(pinLedR, ledRChannel);
   ledcAttachPin(pinLedG, ledGChannel);
   ledcAttachPin(pinLedB, ledBChannel);
-
-  
 }
 
 uint8_t temp = 0; 
@@ -75,11 +76,25 @@ uint8_t unidades = 0;
 uint8_t decenas = 0; 
 uint8_t decimal = 0; 
 uint8_t valor = 0;
+uint8_t digito = 0;
 
 void setup(){
 //Inicializando la posición inicial
   Serial.begin(115200);
-  adcRaw = 0;
+  /*
+  while(! Serial);
+  Serial.print("Connecting to Adafruit IO");
+  // connect to io.adafruit.com
+  io.connect();
+  // wait for a connection
+  while(io.status() < AIO_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  // we are connected
+  Serial.println();
+  Serial.println(io.statusText());
+  */
   pinMode(pulsador_b3, INPUT_PULLUP); // Configurar botón B4 como entrada con pull-up
   configurarPWM(); //configuración del PWM de las leds 
   ledcSetup(servoChannel, 50, 16); //Canal 7, frecuencia de 50Hz, resolución de 16-bits (0-65535)
@@ -108,28 +123,11 @@ void setup(){
 }
 
 void loop(){
-
-  digitalWrite(t1, HIGH);
-  digitalWrite(t2, LOW);
-  digitalWrite(t3, LOW);
-  desplegarValorDecenas(decenas);
-  delay(5);
-
-  digitalWrite(t1, LOW);
-  digitalWrite(t2, HIGH);
-  digitalWrite(t3, LOW);
-  desplegarValorUnidades(unidades);
-  digitalWrite(pdp, HIGH);
-  delay(5);
-
-  digitalWrite(t1, LOW);
-  digitalWrite(t2, LOW);
-  digitalWrite(t3, HIGH);
-  desplegarValorDecimal(decimal);
-  delay(5);
-
 //Al presionar el botón se activa el sensor
   if(digitalRead(pulsador_b3)== LOW){
+    //Mantener la conexión con el adafruit
+    //io.run();
+
     digitalWrite(t1, LOW);
     digitalWrite(t2, LOW);
     digitalWrite(t3, LOW);
@@ -143,12 +141,11 @@ void loop(){
 
   //Lectura del sensor
   analogRead(pinADC);
-  adcRaw = analogRead(pinADC);
-  float voltage = adcRaw * (3.3 / 4095.0); // Convertir lectura a voltaje (3.3V para ESP32)
-  float temperatureC = (voltage + 0.0754) * 100.0; // Convertir voltaje a temperatura en grados Celsius (ajuste para 3.3V)
+  int adcRaw = analogRead(pinADC);
+  float voltage = adcRaw * (4400 / 4096); // Convertir lectura a voltaje (3.3V para ESP32)
+  temperatureC = voltage/10; // Convertir voltaje a temperatura en grados Celsius (ajuste para 3.3V)
   // Redondear la temperatura a un decimal
   temperatureC = round(temperatureC * 10.0) / 10.0;
-  delay(1000); 
 
   //Impresión en el monitor serial de la lectura del sensor
   Serial.print("ADC Raw: ");
@@ -185,18 +182,37 @@ void loop(){
     ledcWrite(servoChannel, map(servoPositionRed, 0, 180, 0, 65535));
  }
 
+  //tempCanal->save(temperatureC);
+  //delay(300);
+}
+  temp = temperatureC * 10; 
+  decenas = temp / 100; 
+  digitalWrite(t1, HIGH);
+  digitalWrite(t2, LOW);
+  digitalWrite(t3, LOW);
+  desplegarValor(decenas);
+  delay(5);
 
-temp = temperatureC * 10; 
-decenas = temp / 100; 
-temp = temp - (decenas * 100);
-unidades = temp / 10;  // Corrección en esta línea
-decimal = int(temperatureC * 10) % 10;  // Corrección en esta línea
-    }
+  temp = temp - (decenas * 100);
+  unidades = temp / 10;  // Corrección en esta línea
+  digitalWrite(t1, LOW);
+  digitalWrite(t2, HIGH);
+  digitalWrite(t3, LOW);
+  desplegarValor(unidades);
+  digitalWrite(pdp, HIGH);
+  delay(5);
+
+  decimal = int(temperatureC * 10) % 10;  // Corrección en esta línea
+  digitalWrite(t1, LOW);
+  digitalWrite(t2, LOW);
+  digitalWrite(t3, HIGH);
+  desplegarValor(decimal);
+  delay(5);
 }
 
 //FUNCIÓN PARA DESPLEGAR VALOR DE DECENAS
-void desplegarValorDecenas(uint8_t decenas){
-  switch (decenas)
+void desplegarValor(uint8_t digito){
+  switch (digito)
   {
   case 0:
     digitalWrite(pA, HIGH);
@@ -301,213 +317,3 @@ case 9:
   }
 }
 
-//FUNCIÓN PARA DESPLEGAR VALOR DE UNIDADES
-void desplegarValorUnidades (uint8_t unidades){
-  switch (unidades)
-  {
-  case 0:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, HIGH);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, LOW);
-    break;
-  case 1:
-    digitalWrite(pA, LOW);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, LOW);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, LOW);
-    digitalWrite(pG, LOW);
-    break;
-  
-  case 2:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, LOW);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, HIGH);
-    digitalWrite(pF, LOW);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 3:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, LOW);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 4:
-    digitalWrite(pA, LOW);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, LOW);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 5:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, LOW);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 6:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, LOW);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, HIGH);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 7:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, LOW);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, LOW);
-    digitalWrite(pG, LOW);
-    break;
-
-case 8:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, HIGH);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 9:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-
-   
-  }
-}
-//FUNCIÓN PARA DESPLEGAR VALOR DE DECIMALES
-void desplegarValorDecimal (uint8_t decimal){
-  switch (decimal)
-  {
-  case 0:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, HIGH);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, LOW);
-    break;
-  case 1:
-    digitalWrite(pA, LOW);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, LOW);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, LOW);
-    digitalWrite(pG, LOW);
-    break;
-  
-  case 2:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, LOW);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, HIGH);
-    digitalWrite(pF, LOW);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 3:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, LOW);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 4:
-    digitalWrite(pA, LOW);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, LOW);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 5:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, LOW);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 6:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, LOW);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, HIGH);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 7:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, LOW);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, LOW);
-    digitalWrite(pG, LOW);
-    break;
-
-case 8:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, HIGH);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-
-case 9:
-    digitalWrite(pA, HIGH);
-    digitalWrite(pB, HIGH);
-    digitalWrite(pC, HIGH);
-    digitalWrite(pD, HIGH);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, HIGH);
-    digitalWrite(pG, HIGH);
-    break;
-  }
-}
