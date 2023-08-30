@@ -124,3 +124,28 @@ case 9:
    
   }
 }
+
+temp = temperatureC * 10; 
+  decenas = temp / 100; 
+  digitalWrite(t1, HIGH);
+  digitalWrite(t2, LOW);
+  digitalWrite(t3, LOW);
+  desplegarValor(decenas);
+  delay(5);
+
+  temp = temp - (decenas * 100);
+  unidades = temp / 10;  // Corrección en esta línea
+  digitalWrite(t1, LOW);
+  digitalWrite(t2, HIGH);
+  digitalWrite(t3, LOW);
+  desplegarValor(unidades);
+  digitalWrite(pdp, HIGH);
+  delay(5);
+
+  decimal = int(temperatureC * 10) % 10;  // Corrección en esta línea
+  digitalWrite(t1, LOW);
+  digitalWrite(t2, LOW);
+  digitalWrite(t3, HIGH);
+  desplegarValor(decimal);
+  delay(5);
+
