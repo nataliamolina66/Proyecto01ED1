@@ -1,0 +1,36 @@
+//Variables para el control del servo motor
+const int servoChannel = 7; //Canal para el servo motor
+const int servoPin = 15; //Pin del servo motor
+int angle = 0; //Ángulo/posición inicial del servo (0: Verde, 1: Amarillo, 2: Rojo)
+//Posición establecida del servo por color de LED
+const int servoPositionGreen = 9; //Posición del servo para el LED verde
+const int servoPositionYellow = 13; //Posición del servo para el LED amarillo
+const int servoPositionRed = 17; //Posición del servo para el LED rojo
+
+ledcSetup(servoChannel, 50, 16); //Canal 7, frecuencia de 50Hz, resolución de 16-bits (0-65535)
+  ledcAttachPin(servoPin, servoChannel);
+ //Inicializando la posición inicial
+  ledcWrite(servoChannel, map(angle, 0, 180, 0, 65535));
+//SERVO EN POSICIÓN DE MAPEO Y LED VERDE ENCENDIDA
+  if (temperatureC < 24) {
+    ledcWrite(ledRChannel, dutycycle); //led verde encendida
+    ledcWrite(ledGChannel, 0); // 
+    ledcWrite(ledBChannel, 0); // 
+    ledcWrite(servoChannel, map(servoPositionGreen, 0, 180, 0, 65535));
+  }
+
+//SERVO EN POSICIÓN DE MAPEO Y LED AMARILLA ENCENDIDA
+  if (temperatureC >= 24 && temperatureC < 26) {
+    ledcWrite(ledRChannel, 0); 
+    ledcWrite(ledGChannel, dutycycle);// led amarilla encendida
+    ledcWrite(ledBChannel, 0); 
+    ledcWrite(servoChannel, map(servoPositionYellow, 0, 180, 0, 65535));
+ }
+
+//SERVO EN POSICIÓN DE MAPEO Y LED ROJA ENCENDIDA
+  if (temperatureC >= 26) {
+    ledcWrite(ledRChannel, 0); 
+    ledcWrite(ledGChannel, 0); 
+    ledcWrite(ledBChannel, dutycycle);// led roja encendida
+    ledcWrite(servoChannel, map(servoPositionRed, 0, 180, 0, 65535));
+ }
