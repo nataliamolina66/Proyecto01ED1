@@ -6,7 +6,7 @@
 volatile float temperatureC;
 
 //Se define el canal que va a mandar datos al feed "Temperatura"
-//AdafruitIO_Feed *tempCanal = io.feed("temperatura");
+AdafruitIO_Feed *tempCanal = io.feed("temperatura");
 
 // Paso 1: selección de parámetros de la señal PWM
 #define ledRChannel 1
@@ -16,7 +16,7 @@ volatile float temperatureC;
 #define freqPWM1 5000 // Frecuencia en Hz
 #define freqPWM2 5000 // Frecuencia en Hz
 #define resolution 8 // 1-16 bits de resolución
-#define pinADC 4 //definición pin del sensor
+#define pinADC 35 //definición pin del sensor
 
 //Variables para el control del servo motor
 const int servoChannel = 7; //Canal para el servo motor
@@ -49,7 +49,7 @@ uint8_t t3 = 23;
 const int  pinLedR = 18;
 const int  pinLedG  = 19;
 const int  pinLedB = 21;
-const int pulsador_b3 = 22; // Pin 14 donde se conecta el botón para obtener la temperatura
+const int pulsador_b3 = 22; // Pin 22 donde se conecta el botón para obtener la temperatura
 
 //VARIABLE PARA EL BRILLO DE LAS LEDS 
 int dutycycle  = 255; 
@@ -71,20 +71,19 @@ void configurarPWM(void)
   ledcAttachPin(pinLedB, ledBChannel);
 }
 
-uint8_t temp = 0; 
+uint16_t temp = 0; 
 uint8_t unidades = 0; 
 uint8_t decenas = 0; 
 uint8_t decimal = 0; 
-uint8_t valor = 0;
 uint8_t digito = 0;
 
 void setup(){
-//Inicializando la posición inicial
   Serial.begin(115200);
-  /*
+  
   while(! Serial);
   Serial.print("Connecting to Adafruit IO");
   // connect to io.adafruit.com
+  
   io.connect();
   // wait for a connection
   while(io.status() < AIO_CONNECTED) {
@@ -94,7 +93,8 @@ void setup(){
   // we are connected
   Serial.println();
   Serial.println(io.statusText());
-  */
+  
+
   pinMode(pulsador_b3, INPUT_PULLUP); // Configurar botón B4 como entrada con pull-up
   configurarPWM(); //configuración del PWM de las leds 
   ledcSetup(servoChannel, 50, 16); //Canal 7, frecuencia de 50Hz, resolución de 16-bits (0-65535)
@@ -126,21 +126,8 @@ void loop(){
 //Al presionar el botón se activa el sensor
   if(digitalRead(pulsador_b3)== LOW){
     //Mantener la conexión con el adafruit
-    //io.run();
-
-    digitalWrite(t1, LOW);
-    digitalWrite(t2, LOW);
-    digitalWrite(t3, LOW);
-    digitalWrite(pA, LOW);
-    digitalWrite(pB, LOW);
-    digitalWrite(pC, LOW);
-    digitalWrite(pD, LOW);
-    digitalWrite(pE, LOW);
-    digitalWrite(pF, LOW);
-    digitalWrite(pG, LOW);
-
+    io.run();
   //Lectura del sensor
-  analogRead(pinADC);
   int adcRaw = analogRead(pinADC);
   float voltage = adcRaw * (4400 / 4096); // Convertir lectura a voltaje (3.3V para ESP32)
   temperatureC = voltage/10; // Convertir voltaje a temperatura en grados Celsius (ajuste para 3.3V)
@@ -159,7 +146,7 @@ void loop(){
   
 
   //SERVO EN POSICIÓN DE MAPEO Y LED VERDE ENCENDIDA
-  if (temperatureC < 24) {
+  if (temperatureC < 18) {
     ledcWrite(ledRChannel, dutycycle); //led verde encendida
     ledcWrite(ledGChannel, 0); // 
     ledcWrite(ledBChannel, 0); // 
@@ -167,7 +154,7 @@ void loop(){
   }
 
 //SERVO EN POSICIÓN DE MAPEO Y LED AMARILLA ENCENDIDA
-  if (temperatureC >= 24 && temperatureC < 26) {
+  if (temperatureC >= 18 && temperatureC < 20 ) {
     ledcWrite(ledRChannel, 0); 
     ledcWrite(ledGChannel, dutycycle);// led amarilla encendida
     ledcWrite(ledBChannel, 0); 
@@ -175,16 +162,17 @@ void loop(){
  }
 
 //SERVO EN POSICIÓN DE MAPEO Y LED ROJA ENCENDIDA
-  if (temperatureC >= 26) {
+  if (temperatureC >= 20) {
     ledcWrite(ledRChannel, 0); 
     ledcWrite(ledGChannel, 0); 
     ledcWrite(ledBChannel, dutycycle);// led roja encendida
     ledcWrite(servoChannel, map(servoPositionRed, 0, 180, 0, 65535));
  }
-
-  //tempCanal->save(temperatureC);
-  //delay(300);
+ 
+  tempCanal->save(temperatureC);
+  delay(300);
 }
+
   temp = temperatureC * 10; 
   decenas = temp / 100; 
   digitalWrite(t1, HIGH);
@@ -316,4 +304,5 @@ case 9:
    
   }
 }
+
 
