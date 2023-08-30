@@ -1,0 +1,7 @@
+//Lectura del sensor
+  analogRead(pinADC);
+  int adcRaw = analogRead(pinADC);
+  float voltage = adcRaw * (4400 / 4096); // Convertir lectura a voltaje 
+  temperatureC = voltage/10; // Convertir voltaje a temperatura en grados Celsius
+  // Redondear la temperatura a un decimal
+  temperatureC = round(temperatureC * 10.0) / 10.0;
