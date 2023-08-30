@@ -1,0 +1,51 @@
+// Paso 1: selección de parámetros de la señal PWM
+#define ledRChannel 1
+#define ledGChannel 2
+#define ledBChannel 3
+#define freqPWM 5000 // Frecuencia en Hz
+#define freqPWM1 5000 // Frecuencia en Hz
+#define freqPWM2 5000 // Frecuencia en Hz
+#define resolution 8 // 1-16 bits de resolución
+
+//VARIABLE PARA EL BRILLO DE LAS LEDS 
+int dutycycle  = 255; 
+//DECLARACIÓN DE FUNCIONES
+void configurarPWM(void); // Declaración anticipada de la función configurarPWM
+
+//Función que configura el PWM de las leds 
+void configurarPWM(void)
+{
+  // Paso 1: Configurar el módulo PWM
+  ledcSetup(ledRChannel, freqPWM1, resolution);
+  ledcSetup(ledGChannel, freqPWM2, resolution);
+  ledcSetup(ledBChannel, freqPWM, resolution);
+
+  // Paso 2: seleccionar en que GPIO tendremos nuestra señal PWM
+  ledcAttachPin(pinLedR, ledRChannel);
+  ledcAttachPin(pinLedG, ledGChannel);
+  ledcAttachPin(pinLedB, ledBChannel);
+}
+
+//SERVO EN POSICIÓN DE MAPEO Y LED VERDE ENCENDIDA
+  if (temperatureC < 24) {
+    ledcWrite(ledRChannel, dutycycle); //led verde encendida
+    ledcWrite(ledGChannel, 0); // 
+    ledcWrite(ledBChannel, 0); // 
+    ledcWrite(servoChannel, map(servoPositionGreen, 0, 180, 0, 65535));
+  }
+
+//SERVO EN POSICIÓN DE MAPEO Y LED AMARILLA ENCENDIDA
+  if (temperatureC >= 24 && temperatureC < 26) {
+    ledcWrite(ledRChannel, 0); 
+    ledcWrite(ledGChannel, dutycycle);// led amarilla encendida
+    ledcWrite(ledBChannel, 0); 
+    ledcWrite(servoChannel, map(servoPositionYellow, 0, 180, 0, 65535));
+ }
+
+//SERVO EN POSICIÓN DE MAPEO Y LED ROJA ENCENDIDA
+  if (temperatureC >= 26) {
+    ledcWrite(ledRChannel, 0); 
+    ledcWrite(ledGChannel, 0); 
+    ledcWrite(ledBChannel, dutycycle);// led roja encendida
+    ledcWrite(servoChannel, map(servoPositionRed, 0, 180, 0, 65535));
+
